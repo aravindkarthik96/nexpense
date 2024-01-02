@@ -1,3 +1,4 @@
+from dateutil import parser
 import re
 
 def create_details_object() :
@@ -24,11 +25,6 @@ def extract_hdfc_transaction_details(email_content):
     if merchant_match:
         details['merchant'] = merchant_match.group(1)
 
-    date_time_pattern = r"on (\d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2})"
-    date_time_match = re.search(date_time_pattern, email_content)
-    if date_time_match:
-        details['date_time'] = date_time_match.group(1)
-
     return details
 
 def extract_kotak_transaction_details(email_content):
@@ -44,11 +40,6 @@ def extract_kotak_transaction_details(email_content):
     merchant_match = re.search(merchant_pattern, email_content)
     if merchant_match:
         details['merchant'] = merchant_match.group(1)
-
-    date_pattern = r"on (\d{2}-\w{3}-\d{4})"
-    date_match = re.search(date_pattern, email_content)
-    if date_match:
-        details['date_time'] = date_match.group(1)
 
     return details
 
@@ -66,11 +57,6 @@ def extract_citibank_transaction_details(email_content):
     if merchant_match:
         details['merchant'] = merchant_match.group(1).strip()
 
-    date_pattern = r"on (\d{2}-\w{3}-\d{2})"
-    date_match = re.search(date_pattern, email_content)
-    if date_match:
-        details['date_time'] = date_match.group(1)
-
     return details
 
 def extract_citibank_upi_transaction_details(email_content):
@@ -86,11 +72,6 @@ def extract_citibank_upi_transaction_details(email_content):
     merchant_match = re.search(merchant_pattern, email_content)
     if merchant_match:
         details['merchant'] = merchant_match.group(1).strip()
-
-    date_pattern = r"on (\d{2}-\w{3}-\d{2})"
-    date_match = re.search(date_pattern, email_content)
-    if date_match:
-        details['date_time'] = date_match.group(1)
 
     return details
 
@@ -118,11 +99,6 @@ def extract_citibank_upi_transaction_details_v2(email_content):
     if amount_match:
         details['transaction_amount'] = amount_match.group(1)
 
-    date_time_pattern = r"on (\d{2}-\w{3}-\d{2,4} at \d{2}:\d{2})"
-    date_time_match = re.search(date_time_pattern, email_content)
-    if date_time_match:
-        details['date_time'] = date_time_match.group(1)
-
     return details
 
 def get_header(header_name, headers):
@@ -130,3 +106,13 @@ def get_header(header_name, headers):
         if name.lower() == header_name.lower():
             return value
     return None
+
+def format_date(date_string):
+    try:
+        date_string = re.sub(r'\s*\([^)]*\)', '', date_string)
+        parsed_date = parser.parse(date_string)
+        return parsed_date.strftime('%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        # Handle the exception if parsing fails
+        print(f"Failed to parse date: {date_string}")
+        return ""
