@@ -1,7 +1,8 @@
 from constants import SHEET_ID
 from PyQt6.QtCore import QThread, pyqtSignal
-from google_apis import get_mime_message, get_processed_message_ids, set_header_row, upload_processed_message_ids, upload_transactions_to_sheet
-import message_parsers as mp
+from main.google_apis.gmail_apis import get_mime_message, get_processed_message_ids
+from main.google_apis.sheets_apis import set_header_row, upload_processed_message_ids, upload_transactions_to_sheet
+import main.processors.message_parsers as mp
 
 class EmailProcessorThread(QThread):
     update_progress = pyqtSignal(int)
@@ -29,37 +30,18 @@ class EmailProcessorThread(QThread):
                 continue
             
             new_message_ids.append(message_id)
-            mime_msg = get_mime_message(self.email_service, 'me', message_id)
+            
+            mime_message = get_mime_message(self.email_service, 'me', message_id)
 
-            if not mime_msg:
+            if not mime_message:
                 continue  
 
             email_body, subject = None, None
-        
-            # Decode the subject and body
-            for header, value in mime_msg.items():
-                if header.lower() == 'subject':
-                    subject = value
             
-            if mime_msg.is_multipart():
-                for part in mime_msg.walk():
-                    if part.get_content_type() in ["text/plain", "text/html"]:
-                        charset = part.get_content_charset()
-                        try:
-                            email_body = part.get_payload(decode=True).decode(charset or 'utf-8')
-                        except UnicodeDecodeError:
-                            email_body = part.get_payload(decode=True).decode('iso-8859-1', errors='replace')
-                        break
-            else:
-                charset = mime_msg.get_content_charset()
-                try:
-                    email_body = mime_msg.get_payload(decode=True).decode(charset or 'utf-8')
-                except UnicodeDecodeError:
-                    email_body = mime_msg.get_payload(decode=True).decode('iso-8859-1', errors='replace')
-            
+            email_body = mp.get_message_body(mime_message)
             
             if email_body:
-                subject = mp.get_header("Subject", mime_msg.items())
+                subject = mp.get_header("Subject", mime_message.items())
                 transaction_email = None
                 if subject == "Alert :  Update on your HDFC Bank Credit Card" :
                     transaction_email = mp.extract_hdfc_transaction_details(email_body)
@@ -74,7 +56,7 @@ class EmailProcessorThread(QThread):
                 
                 if transaction_email != None :
                     transaction_email['message_id'] = message_id
-                    transaction_email['date_time'] = mp.format_date(mp.get_header("Date",mime_msg.items()))
+                    transaction_email['date_time'] = mp.format_date(mp.get_header("Date",mime_message.items()))
                     transactions.append(transaction_email)
                 
             print(f"Completed Fetching email #{idx} | Transactional: {transaction_email != None}")

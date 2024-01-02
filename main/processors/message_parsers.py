@@ -116,3 +116,20 @@ def format_date(date_string):
         # Handle the exception if parsing fails
         print(f"Failed to parse date: {date_string}")
         return ""
+
+def get_message_body(mime_message):
+    if mime_message.is_multipart():
+        for part in mime_message.walk():
+            if part.get_content_type() in ["text/plain", "text/html"]:
+                charset = part.get_content_charset()
+                try:
+                    return part.get_payload(decode=True).decode(charset or 'utf-8')
+                except UnicodeDecodeError:
+                    return part.get_payload(decode=True).decode('iso-8859-1', errors='replace')
+                break
+    else:
+        charset = mime_message.get_content_charset()
+        try:
+            return mime_message.get_payload(decode=True).decode(charset or 'utf-8')
+        except UnicodeDecodeError:
+            return mime_message.get_payload(decode=True).decode('iso-8859-1', errors='replace')

@@ -1,8 +1,9 @@
 from PyQt6.QtWidgets import QMainWindow, QPushButton, QProgressBar
-from googleapiclient.discovery import build
 from constants import EMAIL_COUNT, USER_ID
-from email_processor import EmailProcessorThread
-from google_apis import authenticate
+from main.google_apis.gmail_apis import get_email_serivce, get_message_ids
+from main.google_apis.sheets_apis import get_sheets_serivce
+from main.processors.email_processor import EmailProcessorThread
+from main.google_apis.auth_apis import authenticate
 
 class MainWindow(QMainWindow):
     creds = None
@@ -23,17 +24,15 @@ class MainWindow(QMainWindow):
 
     def syncEmails(self):
         print("fetching emails")
-        email_service = build('gmail', 'v1', credentials=self.creds)
-        sheets_service = build('sheets', 'v4', credentials=self.creds)
+        email_service = get_email_serivce(self.creds)
+        sheets_service = get_sheets_serivce(self.creds)
         
-        results = email_service.users().messages().list(userId=USER_ID, maxResults=EMAIL_COUNT).execute()
-        messages = results.get('messages', [])
+        messages = get_message_ids(email_service, USER_ID, EMAIL_COUNT)
 
         if not messages:
             print("No messages found.")
             return
 
-        # Set up and start the QThread for fetching emails
         self.progress.setMaximum(len(messages))
         self.progress.setValue(0)
         self.button.setDisabled(True)
