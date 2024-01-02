@@ -46,7 +46,7 @@ class EmailProcessorThread(QThread):
             # Ensure we have an email body to process
             if email_body:
                 subject = mp.get_header("Subject", mime_msg.items())
-                transaction_email = ""
+                transaction_email = None
                 if subject == "Alert :  Update on your HDFC Bank Credit Card" :
                     transaction_email = mp.extract_hdfc_transaction_details(email_body)
                 elif subject == "Kotak Bank Credit Card Transaction Alert" :
@@ -58,7 +58,8 @@ class EmailProcessorThread(QThread):
                 elif subject == "CitiAlert - UPI Fund Transfer Acknowledgement" :
                     transaction_email = mp.extract_citibank_upi_transaction_details_v2(email_body)
                 
-                if transaction_email != "" :
+                if transaction_email != None :
+                    transaction_email['message_id'] = message['id']
                     transactions.append(transaction_email)
                     print(transaction_email)
                 

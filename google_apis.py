@@ -12,15 +12,16 @@ from constants import SCOPES
 def upload_transactions_to_sheet(email_service, spreadsheet_id, transactions):
     print(f"Uploading emails to sheets {len(transactions)}")
     # Prepare the data to upload
-    values = [["Date","Bank", "Amount", "Type", "Merchant"]]  # Your header row
+    values = [["MessageID","Date","Bank", "Amount", "Type", "Merchant"]]  # Your header row
     for transaction in transactions:
         try:
             # Convert the JSON string into a Python dictionary
             transaction_json = transaction
 
             values.append([
-            transaction_json["bank_name"],
-            transaction_json['date_time'],
+            transaction_json["message_id"],
+            transaction_json["date_time"],
+            transaction_json['bank_name'],
             transaction_json['transaction_amount'],
             transaction_json['type'],
             transaction_json['merchant']

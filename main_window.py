@@ -1,8 +1,7 @@
-import os.path
 from PyQt6.QtWidgets import QMainWindow, QPushButton, QProgressBar
 from googleapiclient.discovery import build
-from constants import EMAIL_COUNT, SCOPES, USER_ID
-from email_processor import EmailFetcherThread
+from constants import EMAIL_COUNT, USER_ID
+from email_processor import EmailProcessorThread
 from google_apis import authenticate
 
 class MainWindow(QMainWindow):
@@ -39,7 +38,7 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         self.button.setDisabled(True)
 
-        self.thread = EmailFetcherThread(email_service, sheets_service, messages)
+        self.thread = EmailProcessorThread(email_service, sheets_service, messages)
         self.thread.update_progress.connect(self.update_progress)
         self.thread.finished.connect(self.fetching_complete)
         self.thread.start()

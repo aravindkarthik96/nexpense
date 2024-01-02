@@ -1,5 +1,5 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton, QProgressBar
+from PyQt6.QtWidgets import QApplication
 from googleapiclient.discovery import build
 from main_window import MainWindow
 
