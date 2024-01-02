@@ -6,13 +6,33 @@ from httplib2 import Credentials
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+from requests import HTTPError
 
 from constants import SCOPES
 
-def upload_transactions_to_sheet(email_service, spreadsheet_id, transactions):
+def upload_processed_message_ids(sheets_service,spreadsheet_id, message_ids):
+    print(f"Uploading processed messages")
+    values = []
+    
+    for message_id in message_ids :
+        values.append([message_id])
+    
+    body = {
+        'values': values
+    }
+    
+    result = sheets_service.spreadsheets().values().append(
+        spreadsheetId=spreadsheet_id,
+        range="Sheet2",
+        valueInputOption="USER_ENTERED",
+        body=body).execute()
+    print(f"{result.get('updates').get('updatedCells')} cells appended.")
+
+def upload_transactions_to_sheet(sheets_service, spreadsheet_id, transactions):
     print(f"Uploading emails to sheets {len(transactions)}")
     # Prepare the data to upload
-    values = [["MessageID","Date","Bank", "Amount", "Type", "Merchant"]]  # Your header row
+    # values = [["MessageID","Date","Bank", "Amount", "Type", "Merchant"]]  # Your header row
+    values = []
     for transaction in transactions:
         try:
             # Convert the JSON string into a Python dictionary
@@ -36,7 +56,7 @@ def upload_transactions_to_sheet(email_service, spreadsheet_id, transactions):
     }
 
     # Use the Sheets API to append the data
-    result = email_service.spreadsheets().values().append(
+    result = sheets_service.spreadsheets().values().append(
         spreadsheetId=spreadsheet_id,
         range="Sheet1",  # Adjust if your sheet is named differently
         valueInputOption="USER_ENTERED",
@@ -71,3 +91,23 @@ def authenticate():
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
     return creds
+
+def get_processed_message_ids(sheets_service, spreadsheet_id):
+    try:
+        result = (
+            sheets_service.spreadsheets()
+            .values()
+            .get(spreadsheetId=spreadsheet_id, range="Sheet2!A:A")
+            .execute()
+        )
+        
+        values = []
+        
+        for row in result.get("values", []) :
+            values.append(row[0])
+            
+        print(f"{len(values)} rows retrieved {values}")
+        return values
+    except HTTPError as error:
+        print(f"An error occurred: {error}")
+        return []
