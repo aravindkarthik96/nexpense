@@ -20,6 +20,7 @@ class EmailProcessorThread(QThread):
         for idx, message in enumerate(self.messages):
             message_id = message['id']
             new_message_ids.append(message_id)
+            self.update_progress.emit(idx + 1)
             
             if message_id in set(previously_processed_emails) :
                 print(f"skipping message {message_id}, already present in DB")
@@ -74,7 +75,6 @@ class EmailProcessorThread(QThread):
                     print(transaction_email)
                 
             print(f"Completed Fetching email #{idx}")
-            self.update_progress.emit(idx + 1)
 
         upload_transactions_to_sheet(self.sheets_service,SHEET_ID,transactions)
         
