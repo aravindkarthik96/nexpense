@@ -3,7 +3,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from google_apis import get_mime_message, upload_transactions_to_sheet
 import message_parsers as mp
 
-class EmailFetcherThread(QThread):
+class EmailProcessorThread(QThread):
     update_progress = pyqtSignal(int)
     finished = pyqtSignal()
 

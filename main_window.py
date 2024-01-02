@@ -2,7 +2,7 @@ import os.path
 from PyQt6.QtWidgets import QMainWindow, QPushButton, QProgressBar
 from googleapiclient.discovery import build
 from constants import EMAIL_COUNT, SCOPES, USER_ID
-from email_fetcher import EmailFetcherThread
+from email_processor import EmailFetcherThread
 from google_apis import authenticate
 
 class MainWindow(QMainWindow):
