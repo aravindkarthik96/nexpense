@@ -128,10 +128,18 @@ def extract_citibank_upi_transaction_details_v2(email_content):
     }
 
     # Look for "credited" or "debited" in the email content to determine the transaction type
-    if "has been credited" in email_content:
+    if "Your Citibank A/c has been credited" in email_content:
         details['type'] = 'credit'
-    elif "has been debited" in email_content:
+        merchant_pattern = r"received from (.*?). UPI"
+        merchant_match = re.search(merchant_pattern, email_content)
+        if merchant_match:
+            details['merchant'] = merchant_match.group(1).strip()
+    elif "Your Citibank A/c has been debited" in email_content:
         details['type'] = 'debit'
+        merchant_pattern = r"and account (.*?) has been credited"
+        merchant_match = re.search(merchant_pattern, email_content)
+        if merchant_match:
+            details['merchant'] = merchant_match.group(1).strip()
 
     # Remaining pattern matching as before
     amount_pattern = r"INR (\d+(?:\.\d{1,2})?)"
@@ -143,11 +151,6 @@ def extract_citibank_upi_transaction_details_v2(email_content):
     date_time_match = re.search(date_time_pattern, email_content)
     if date_time_match:
         details['date_time'] = date_time_match.group(1)
-
-    merchant_pattern = r"and account (.*?) has been credited"
-    merchant_match = re.search(merchant_pattern, email_content)
-    if merchant_match:
-        details['merchant'] = merchant_match.group(1).strip()
 
     return details
 

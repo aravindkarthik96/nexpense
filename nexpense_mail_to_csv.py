@@ -1,3 +1,4 @@
+import json
 import sys
 import os.path
 import base64
@@ -12,13 +13,16 @@ from email import message_from_bytes
 import message_parsers as mp
 
 # If modifying these SCOPES, delete the file token.json.
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+SCOPES = ['https://www.googleapis.com/auth/gmail.readonly',
+          'https://www.googleapis.com/auth/spreadsheets', 
+          'https://www.googleapis.com/auth/gmail.readonly']
 EMAIL_COUNT = 50
 USER_ID = 'me'
+SHEET_ID = "1Q1mnua1FAU1jiBHDMWxnIa7rXaG1vpv0RuS7SeZDnZQ"
 
-def get_mime_message(service, user_id, msg_id):
+def get_mime_message(email_service, user_id, msg_id):
     try:
-        message = service.users().messages().get(userId=user_id, id=msg_id, format='raw').execute()
+        message = email_service.users().messages().get(userId=user_id, id=msg_id, format='raw').execute()
         msg_raw = base64.urlsafe_b64decode(message['raw'].encode('ASCII'))
         mime_msg = email.message_from_bytes(msg_raw)
         return mime_msg
@@ -26,19 +30,53 @@ def get_mime_message(service, user_id, msg_id):
     except Exception as error:
         print(f'An error occurred: {error}')
         return None
+    
+def upload_transactions_to_sheet(email_service, spreadsheet_id, transactions):
+    print(f"Uploading emails to sheets {len(transactions)}")
+    # Prepare the data to upload
+    values = [["Date", "Amount", "Type", "Merchant"]]  # Your header row
+    for transaction in transactions:
+        try:
+            # Convert the JSON string into a Python dictionary
+            transaction_json = transaction
+
+            values.append([
+            transaction_json['date_time'],
+            transaction_json['transaction_amount'],
+            transaction_json['type'],
+            transaction_json['merchant']
+        ])
+            
+        except Exception as error:
+            print(f"Invalid JSON string - message: {transaction} error: {error}")
+            return "Invalid JSON string"
+
+    body = {
+        'values': values
+    }
+
+    # Use the Sheets API to append the data
+    result = email_service.spreadsheets().values().append(
+        spreadsheetId=spreadsheet_id,
+        range="Sheet1",  # Adjust if your sheet is named differently
+        valueInputOption="USER_ENTERED",
+        body=body).execute()
+    print(f"{result.get('updates').get('updatedCells')} cells appended.")
 
 class EmailFetcherThread(QThread):
     update_progress = pyqtSignal(int)
     finished = pyqtSignal()
 
-    def __init__(self, service, messages):
+    def __init__(self, email_service, sheets_service, messages):
         super().__init__()
-        self.service = service
+        self.email_service = email_service
+        self.sheets_service = sheets_service
         self.messages = messages
 
     def run(self):
+        transactions = []
         for idx, message in enumerate(self.messages):
-            mime_msg = get_mime_message(self.service, 'me', message['id'])
+            mime_msg = get_mime_message(self.email_service, 'me', message['id'])
             if not mime_msg:
                 continue  # if the message couldn't be retrieved, skip it
             # Now let's handle the MIME message to get the email body and subject
@@ -68,21 +106,26 @@ class EmailFetcherThread(QThread):
             # Ensure we have an email body to process
             if email_body:
                 subject = mp.get_header("Subject", mime_msg.items())
-                
+                transaction_email = ""
                 if subject == "Alert :  Update on your HDFC Bank Credit Card" :
-                    print(mp.extract_hdfc_transaction_details(email_body))
+                    transaction_email = mp.extract_hdfc_transaction_details(email_body)
                 elif subject == "Kotak Bank Credit Card Transaction Alert" :
-                    print(mp.extract_kotak_transaction_details(email_body))
+                    transaction_email = mp.extract_kotak_transaction_details(email_body)
                 elif subject == "Citi Purchase Alert" :
-                    print(mp.extract_citibank_transaction_details(email_body))
+                    transaction_email = mp.extract_citibank_transaction_details(email_body)
                 elif subject == "CitiAlert - UPI Transaction Successful" :
-                    print(mp.extract_citibank_upi_transaction_details(email_body))
+                    transaction_email = mp.extract_citibank_upi_transaction_details(email_body)
                 elif subject == "CitiAlert - UPI Fund Transfer Acknowledgement" :
-                    print(mp.extract_citibank_upi_transaction_details_v2(email_body))
+                    transaction_email = mp.extract_citibank_upi_transaction_details_v2(email_body)
+                
+                if transaction_email != "" :
+                    transactions.append(transaction_email)
+                    print(transaction_email)
                 
             print(f"Completed Fetching email #{idx}")
             self.update_progress.emit(idx + 1)
 
+        upload_transactions_to_sheet(self.sheets_service,SHEET_ID,transactions)
         # Emit signal when finished
         self.finished.emit()
 
@@ -114,9 +157,11 @@ class MainWindow(QMainWindow):
             with open('token.json', 'w') as token:
                 token.write(creds.to_json())
 
-        service = build('gmail', 'v1', credentials=creds)
-        results = service.users().messages().list(userId=USER_ID, maxResults=EMAIL_COUNT).execute()
+        email_service = build('gmail', 'v1', credentials=creds)
+        results = email_service.users().messages().list(userId=USER_ID, maxResults=EMAIL_COUNT).execute()
         messages = results.get('messages', [])
+        
+        sheets_service = build('sheets', 'v4', credentials=creds)
 
         if not messages:
             print("No messages found.")
@@ -127,7 +172,7 @@ class MainWindow(QMainWindow):
         self.progress.setValue(0)
         self.button.setDisabled(True)
 
-        self.thread = EmailFetcherThread(service, messages)
+        self.thread = EmailFetcherThread(email_service, sheets_service, messages)
         self.thread.update_progress.connect(self.update_progress)
         self.thread.finished.connect(self.fetching_complete)
         self.thread.start()
