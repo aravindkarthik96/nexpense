@@ -1,6 +1,6 @@
 from constants import SHEET_ID
 from PyQt6.QtCore import QThread, pyqtSignal
-from google_apis import upload_transactions_to_sheet
+from google_apis import get_mime_message, upload_transactions_to_sheet
 import message_parsers as mp
 
 class EmailFetcherThread(QThread):
@@ -16,7 +16,7 @@ class EmailFetcherThread(QThread):
     def run(self):
         transactions = []
         for idx, message in enumerate(self.messages):
-            mime_msg = self.get_mime_message(self.email_service, 'me', message['id'])
+            mime_msg = get_mime_message(self.email_service, 'me', message['id'])
             if not mime_msg:
                 continue  # if the message couldn't be retrieved, skip it
             # Now let's handle the MIME message to get the email body and subject
