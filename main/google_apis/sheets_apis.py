@@ -72,3 +72,23 @@ def set_header_row(previously_processed_emails, sheets_service, spreadsheet_id):
         valueInputOption="USER_ENTERED",
         body=body).execute()
     print(f"{result.get('updates').get('updatedCells')} cells appended.")
+    
+def get_processed_message_ids(sheets_service, spreadsheet_id):
+    try:
+        result = (
+            sheets_service.spreadsheets()
+            .values()
+            .get(spreadsheetId=spreadsheet_id, range="Sheet2!A:A")
+            .execute()
+        )
+        
+        values = []
+        
+        for row in result.get("values", []) :
+            values.append(row[0])
+            
+        print(f"{len(values)} rows retrieved")
+        return values
+    except HTTPError as error:
+        print(f"An error occurred: {error}")
+        return []
