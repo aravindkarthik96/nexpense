@@ -34,27 +34,25 @@ class MainWindow(QMainWindow):
         )
 
     def syncEmails(self):
-        print("fetching emails")
-        email_service = get_email_serivce(self.creds)
-        sheets_service = get_sheets_serivce(self.creds)
+        self.processing_start()
+        self.thread = EmailProcessorThread(creds=self.creds)
+        self.thread.update_progress.connect(self.update_progress)
+        self.thread.finished.connect(self.processing_complete)
+        self.thread.start()
 
-        messages = get_message_ids(email_service, USER_ID, EMAIL_COUNT)
-
-        if not messages:
-            print("No messages found.")
-            return
-
-        self.progress.setMaximum(len(messages))
-        self.progress.setValue(0)
-        self.sync_button.setDisabled(True)
-
-        self.thread = EmailProcessorThread(email_service, sheets_service, messages)
+    def get_insights_from_data(self):
+        self.processing_start()
+        self.thread = InsightsProcessorThread(creds=self.creds)
         self.thread.update_progress.connect(self.update_progress)
         self.thread.finished.connect(self.processing_complete)
         self.thread.start()
 
     def update_progress(self, value):
         self.progress.setValue(value)
+
+    def processing_start(self):
+        self.reset_progress_bar()
+        self.set_buttons_enabled_state(False)
 
     def processing_complete(self):
         print(f"Completed syncing {EMAIL_COUNT} emails")
@@ -69,17 +67,10 @@ class MainWindow(QMainWindow):
         self.creds = authenticate()
         self.get_insights_from_data()
 
-    def get_insights_from_data(self):
-        sheets_service = get_sheets_serivce(self.creds)
-
-        processed_transactions = fetch_processed_transactions(self.creds, SHEET_ID)
-
-        self.progress.setMaximum(len(processed_transactions))
+    def reset_progress_bar(self):
+        self.progress.setMaximum(1)
         self.progress.setValue(0)
-        self.sync_button.setDisabled(True)
-        self.get_insights_button.setDisabled(True)
 
-        self.thread = InsightsProcessorThread(sheets_service, processed_transactions)
-        self.thread.update_progress.connect(self.update_progress)
-        self.thread.finished.connect(self.processing_complete)
-        self.thread.start()
+    def set_buttons_enabled_state(self, state: bool):
+        self.sync_button.setDisabled(not (state))
+        self.get_insights_button.setDisabled(not (state))

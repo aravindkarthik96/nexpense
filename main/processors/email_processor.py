@@ -1,7 +1,8 @@
-from constants import SHEET_ID
+from constants import EMAIL_COUNT, SHEET_ID, USER_ID
 from PyQt6.QtCore import QThread, pyqtSignal
-from main.google_apis.gmail_apis import get_mime_message
+from main.google_apis.gmail_apis import get_email_serivce, get_message_ids, get_mime_message
 from main.google_apis.sheets_apis import (
+    get_sheets_serivce,
     set_header_row,
     upload_processed_message_ids,
     upload_transactions_to_sheet,
@@ -14,24 +15,32 @@ class EmailProcessorThread(QThread):
     update_progress = pyqtSignal(int)
     finished = pyqtSignal()
 
-    def __init__(self, email_service, sheets_service, messages):
+    def __init__(self, creds):
         super().__init__()
-        self.email_service = email_service
-        self.sheets_service = sheets_service
-        self.messages = messages
+        self.creds = creds
 
     def run(self):
+        print("fetching emails")
+        email_service = get_email_serivce(self.creds)
+        sheets_service = get_sheets_serivce(self.creds)
+        messages = get_message_ids(email_service, USER_ID, EMAIL_COUNT)
+
+        if not messages:
+            print("No messages found.")
+            return
         transactions = []
         previously_processed_emails = get_processed_message_ids(
-            self.sheets_service, SHEET_ID
+            sheets_service, SHEET_ID
         )
 
-        set_header_row(previously_processed_emails, self.sheets_service, SHEET_ID)
+        set_header_row(previously_processed_emails, sheets_service, SHEET_ID)
 
         new_message_ids = []
-        for idx, message in enumerate(self.messages):
+        message_count = len(messages)
+        
+        for index, message in enumerate(messages):
             message_id = message["id"]
-            self.update_progress.emit(idx + 1)
+            self.update_progress.emit((index / message_count)*100)
 
             if message_id in set(previously_processed_emails):
                 print(f"skipping message {message_id}, already present in DB")
@@ -39,7 +48,7 @@ class EmailProcessorThread(QThread):
 
             new_message_ids.append(message_id)
 
-            mime_message = get_mime_message(self.email_service, "me", message_id)
+            mime_message = get_mime_message(email_service, "me", message_id)
 
             if not mime_message:
                 continue
@@ -76,10 +85,10 @@ class EmailProcessorThread(QThread):
                     transactions.append(transaction_email)
 
             print(
-                f"Completed Fetching email #{idx} | Transactional: {transaction_email != None}"
+                f"Completed Fetching email #{index} | Transactional: {transaction_email != None}"
             )
 
-        upload_transactions_to_sheet(self.sheets_service, SHEET_ID, transactions)
-        upload_processed_message_ids(self.sheets_service, SHEET_ID, new_message_ids)
+        upload_transactions_to_sheet(sheets_service, SHEET_ID, transactions)
+        upload_processed_message_ids(sheets_service, SHEET_ID, new_message_ids)
         # Emit signal when finished
         self.finished.emit()
