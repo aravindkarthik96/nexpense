@@ -92,3 +92,12 @@ def get_processed_message_ids(sheets_service, spreadsheet_id):
     except HTTPError as error:
         print(f"An error occurred: {error}")
         return []
+
+def fetch_processed_transactions(creds,spreadsheet_id) -> list:
+        service = get_sheets_serivce(creds=creds)
+
+        sheet = service.spreadsheets()
+        result = (
+            sheet.values().get(spreadsheetId=spreadsheet_id, range="Sheet1!A2:F").execute()
+        )
+        return result.get("values", [])
