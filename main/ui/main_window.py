@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QMainWindow, QPushButton, QProgressBar
-from constants import EMAIL_COUNT, SHEET_ID, USER_ID
+from constants import EMAIL_COUNT
 from main.google_apis.gmail_apis import get_email_serivce, get_message_ids
 from main.google_apis.sheets_apis import (
     fetch_processed_transactions,
