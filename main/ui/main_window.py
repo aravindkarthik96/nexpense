@@ -1,4 +1,5 @@
 from PyQt6.QtWidgets import QMainWindow, QPushButton, QProgressBar, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtGui import QColor
 from constants import EMAIL_COUNT, SHEET_ID
 from main.google_apis.gmail_apis import get_email_serivce, get_message_ids
 from main.google_apis.sheets_apis import (
@@ -38,12 +39,11 @@ class MainWindow(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
-
+        self.showFullScreen()
+        
         self.sync_button.clicked.connect(self.autenticate_and_fetch_emails)
         self.get_insights_button.clicked.connect(self.authenticate_and_get_insights_from_data)
         self.autenticate_and_fetch_emails()
-        
-
 
     def syncEmails(self):
         self.processing_start()
@@ -91,8 +91,23 @@ class MainWindow(QMainWindow):
     def display_transactions(self, transactions):
         self.table.setRowCount(len(transactions))
         for row, transaction in enumerate(transactions):
-            self.table.setItem(row, 0, QTableWidgetItem(transaction[1]))
-            self.table.setItem(row, 1, QTableWidgetItem(str(transaction[5])))
-            self.table.setItem(row, 2, QTableWidgetItem(transaction[2]))
-            self.table.setItem(row, 3, QTableWidgetItem(transaction[3]))
+            is_debit = transaction[4] == 'debit'
+            
+            date_item = QTableWidgetItem(transaction[1])
+            merchant_item = QTableWidgetItem(str(transaction[5]))
+            bank_item = QTableWidgetItem(transaction[2])
+            amount_item = QTableWidgetItem(transaction[3])
+            
+            color = QColor(188, 99, 99) if is_debit else QColor(99, 188, 99)
+            
+            for item in [merchant_item, date_item, bank_item, amount_item]:
+                item.setBackground(color)
+            
             self.table.scrollToBottom()
+            
+        
+            self.table.setItem(row, 0, date_item)
+            self.table.setItem(row, 1, merchant_item)
+            self.table.setItem(row, 2, bank_item)
+            self.table.setItem(row, 3, amount_item)
+        
