@@ -1,5 +1,5 @@
-from PyQt6.QtWidgets import QMainWindow, QPushButton, QProgressBar
-from constants import EMAIL_COUNT
+from PyQt6.QtWidgets import QMainWindow, QPushButton, QProgressBar, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from constants import EMAIL_COUNT, SHEET_ID
 from main.google_apis.gmail_apis import get_email_serivce, get_message_ids
 from main.google_apis.sheets_apis import (
     fetch_processed_transactions,
@@ -17,21 +17,33 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Nexpense")
-        self.setGeometry(50, 100, 400, 200)
+        self.setGeometry(50, 100, 600, 400)  # Adjusted for extra content
 
-        self.sync_button = QPushButton("Sync Emails", self)
-        self.sync_button.setGeometry(50, 20, 300, 40)
+        layout = QVBoxLayout()
 
-        self.get_insights_button = QPushButton("Gather Insights", self)
-        self.get_insights_button.setGeometry(50, 70, 300, 40)
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(4)  # Merchant, Expense, Bank, Memo
+        self.table.setHorizontalHeaderLabels(["Date", "Merchant name", "Bank", "Amount"])
+        layout.addWidget(self.table)
+
+        self.sync_button = QPushButton("Refresh Emails")
+        layout.addWidget(self.sync_button)
+
+        self.get_insights_button = QPushButton("Gather Insights")
+        layout.addWidget(self.get_insights_button)
 
         self.progress = QProgressBar(self)
-        self.progress.setGeometry(50, 140, 300, 20)
+        layout.addWidget(self.progress)
+
+        container = QWidget()
+        container.setLayout(layout)
+        self.setCentralWidget(container)
 
         self.sync_button.clicked.connect(self.autenticate_and_fetch_emails)
-        self.get_insights_button.clicked.connect(
-            self.authenticate_and_get_insights_from_data
-        )
+        self.get_insights_button.clicked.connect(self.authenticate_and_get_insights_from_data)
+        self.autenticate_and_fetch_emails()
+        
+
 
     def syncEmails(self):
         self.processing_start()
@@ -62,6 +74,7 @@ class MainWindow(QMainWindow):
     def autenticate_and_fetch_emails(self):
         self.creds = authenticate()
         self.syncEmails()
+        self.display_transactions(fetch_processed_transactions(self.creds,spreadsheet_id=SHEET_ID))
 
     def authenticate_and_get_insights_from_data(self):
         self.creds = authenticate()
@@ -74,3 +87,12 @@ class MainWindow(QMainWindow):
     def set_buttons_enabled_state(self, state: bool):
         self.sync_button.setDisabled(not (state))
         self.get_insights_button.setDisabled(not (state))
+        
+    def display_transactions(self, transactions):
+        self.table.setRowCount(len(transactions))
+        for row, transaction in enumerate(transactions):
+            self.table.setItem(row, 0, QTableWidgetItem(transaction[1]))
+            self.table.setItem(row, 1, QTableWidgetItem(str(transaction[5])))
+            self.table.setItem(row, 2, QTableWidgetItem(transaction[2]))
+            self.table.setItem(row, 3, QTableWidgetItem(transaction[3]))
+            self.table.scrollToBottom()
