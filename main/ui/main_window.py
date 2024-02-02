@@ -1,11 +1,23 @@
-from PyQt6.QtWidgets import QMainWindow, QPushButton, QProgressBar, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QMainWindow,
+    QPushButton,
+    QProgressBar,
+    QTableWidget,
+    QTableWidgetItem,
+    QComboBox,
+    QVBoxLayout,
+    QWidget,
+    QHBoxLayout,
+)
 from PyQt6.QtGui import QColor
 from constants import EMAIL_COUNT, SHEET_ID
 from main.google_apis.gmail_apis import get_email_serivce, get_message_ids
 from main.google_apis.sheets_apis import (
     fetch_processed_transactions,
     get_sheets_serivce,
+    find_row_by_message_id_and_update_tag,
 )
+from PyQt6.QtCore import Qt
 from main.processors.email_processor import EmailProcessorThread
 from main.google_apis.auth_apis import authenticate
 from main.processors.insights_processor import InsightsProcessorThread
@@ -18,20 +30,27 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("Nexpense")
-        self.setGeometry(50, 100, 600, 400)  # Adjusted for extra content
+        self.setGeometry(50, 100, 600, 400)
 
         layout = QVBoxLayout()
-
+        labels = ["Date", "Merchant name", "Bank name", "Amount", "Tag"]
         self.table = QTableWidget(self)
-        self.table.setColumnCount(4)  # Merchant, Expense, Bank, Memo
-        self.table.setHorizontalHeaderLabels(["Date", "Merchant name", "Bank", "Amount"])
+        self.table.setColumnCount(len(labels))
+        self.table.setHorizontalHeaderLabels(labels)
         layout.addWidget(self.table)
 
-        self.sync_button = QPushButton("Refresh Emails")
-        layout.addWidget(self.sync_button)
+        buttonsLayout = QHBoxLayout()
+
+        self.sync_button = QPushButton("Sync Emails")
+        buttonsLayout.addWidget(self.sync_button)
 
         self.get_insights_button = QPushButton("Gather Insights")
-        layout.addWidget(self.get_insights_button)
+        buttonsLayout.addWidget(self.get_insights_button)
+
+        self.update_tags_button = QPushButton("Update tags")
+        buttonsLayout.addWidget(self.update_tags_button)
+
+        layout.addLayout(buttonsLayout)
 
         self.progress = QProgressBar(self)
         layout.addWidget(self.progress)
@@ -39,11 +58,13 @@ class MainWindow(QMainWindow):
         container = QWidget()
         container.setLayout(layout)
         self.setCentralWidget(container)
-        self.showFullScreen()
-        
+
         self.sync_button.clicked.connect(self.autenticate_and_fetch_emails)
-        self.get_insights_button.clicked.connect(self.authenticate_and_get_insights_from_data)
+        self.get_insights_button.clicked.connect(
+            self.authenticate_and_get_insights_from_data
+        )
         self.autenticate_and_fetch_emails()
+        self.table.itemChanged.connect(self.on_item_changed)
 
     def syncEmails(self):
         self.processing_start()
@@ -74,7 +95,9 @@ class MainWindow(QMainWindow):
     def autenticate_and_fetch_emails(self):
         self.creds = authenticate()
         self.syncEmails()
-        self.display_transactions(fetch_processed_transactions(self.creds,spreadsheet_id=SHEET_ID))
+        self.display_transactions(
+            fetch_processed_transactions(self.creds, spreadsheet_id=SHEET_ID)
+        )
 
     def authenticate_and_get_insights_from_data(self):
         self.creds = authenticate()
@@ -87,27 +110,54 @@ class MainWindow(QMainWindow):
     def set_buttons_enabled_state(self, state: bool):
         self.sync_button.setDisabled(not (state))
         self.get_insights_button.setDisabled(not (state))
-        
+
+    def on_item_changed(self, item):
+        print("item changed" + str(item))
+
     def display_transactions(self, transactions):
         self.table.setRowCount(len(transactions))
         for row, transaction in enumerate(transactions):
-            is_debit = transaction[4] == 'debit'
-            
-            date_item = QTableWidgetItem(transaction[1])
-            merchant_item = QTableWidgetItem(str(transaction[5]))
-            bank_item = QTableWidgetItem(transaction[2])
-            amount_item = QTableWidgetItem(transaction[3])
-            
-            color = QColor(188, 99, 99) if is_debit else QColor(99, 188, 99)
-            
-            for item in [merchant_item, date_item, bank_item, amount_item]:
-                item.setBackground(color)
-            
+            is_debit = transaction[4] == "debit"
+            tag_combobox = QComboBox()
+            current_tag = transaction[6]
+            tag_combobox.addItems(["Food Orders", "Hobbies", "Utilities", "Transport"])
+
+            tag_index = tag_combobox.findText(current_tag)
+            if tag_index >= 0:
+                tag_combobox.setCurrentIndex(tag_index)
+            else:
+                tag_combobox.addItems([current_tag])
+                tag_combobox.setCurrentIndex(tag_combobox.findText(current_tag))
+
+            tag_combobox.currentIndexChanged.connect(
+                lambda index, row=row, combobox=tag_combobox: self.on_tag_changed(
+                    transaction[0],
+                    combobox.currentText(),
+                )
+            )
+
+            columns = [
+                QTableWidgetItem(transaction[1]),
+                QTableWidgetItem(str(transaction[5])),
+                QTableWidgetItem(transaction[2]),
+                QTableWidgetItem(transaction[3]),
+            ]
+
+            color: QColor = QColor(188, 99, 99) if is_debit else QColor(99, 188, 99)
+
+            for index, column in enumerate(columns):
+                column.setBackground(color)
+                column.setFlags(
+                    Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+                )
+                self.table.setItem(row, index, column)
+
+            self.table.setCellWidget(row, 4, tag_combobox)
+
             self.table.scrollToBottom()
-            
-        
-            self.table.setItem(row, 0, date_item)
-            self.table.setItem(row, 1, merchant_item)
-            self.table.setItem(row, 2, bank_item)
-            self.table.setItem(row, 3, amount_item)
-        
+
+    def on_tag_changed(self, message_id, new_tag):
+        print(f"Updating tag for message ID {message_id} to {new_tag}")
+        find_row_by_message_id_and_update_tag(
+            get_sheets_serivce(creds=self.creds), SHEET_ID, message_id, new_tag
+        )

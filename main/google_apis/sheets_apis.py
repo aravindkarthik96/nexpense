@@ -116,6 +116,38 @@ def fetch_processed_transactions(creds, spreadsheet_id) -> list:
 
     sheet = service.spreadsheets()
     result = (
-        sheet.values().get(spreadsheetId=spreadsheet_id, range="Sheet1!A2:F").execute()
+        sheet.values().get(spreadsheetId=spreadsheet_id, range="Sheet1!A2:G").execute()
     )
     return result.get("values", [])
+
+def find_row_by_message_id_and_update_tag(sheets_service, spreadsheet_id, message_id, new_tag):
+    try:
+        column_range = 'Sheet1!A:A'
+        result = sheets_service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=column_range
+        ).execute()
+
+        message_ids = result.get('values', [])
+
+        row_number = next((i + 1 for i, val in enumerate(message_ids) if val and val[0] == message_id), None)
+
+        if row_number is not None:
+            tag_range = f'Sheet1!G{row_number}'
+            values = [[new_tag]]
+            body = {'values': values}
+            update_result = sheets_service.spreadsheets().values().update(
+                spreadsheetId=spreadsheet_id,
+                range=tag_range,
+                valueInputOption='USER_ENTERED',
+                body=body
+            ).execute()
+
+            print(f"Tag updated for message ID '{message_id}' at row {row_number}. {update_result.get('updatedCells')} cells updated.")
+        else:
+            print(f"Message ID '{message_id}' not found in the spreadsheet.")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+
