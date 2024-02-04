@@ -1,9 +1,14 @@
 from PyQt6.QtWidgets import QDialog, QTableWidget, QTableWidgetItem, QVBoxLayout, QPushButton, QLineEdit
 from PyQt6.QtCore import Qt
+from numpy import empty
+from constants import SHEET_ID
+
+from main.google_apis.sheets_apis import get_sheets_serivce, upload_new_tag
 
 class TagsDialog(QDialog):
-    def __init__(self, tags, parent=None):
+    def __init__(self, creds, tags, parent=None):
         super().__init__(parent)
+        self.creds = creds
         self.setWindowTitle("Available Tags")
         self.setGeometry(100, 100, 300, 200)  # Adjust size as needed
 
@@ -27,22 +32,14 @@ class TagsDialog(QDialog):
     def add_new_tag_row(self):
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
-
-        # Option 1: Use QTableWidgetItem and set it to be editable
         new_item = QTableWidgetItem("")
         new_item.setFlags(new_item.flags() | Qt.ItemFlag.ItemIsEditable)
         self.table.setItem(row_position, 0, new_item)
-
-        # Option 2: Use QLineEdit as an editor (comment out if using option 1)
-        # line_edit = QLineEdit(self.table)
-        # self.table.setCellWidget(row_position, 0, line_edit)
-
-        self.table.editItem(new_item)  # Automatically start editing the new item
-        # For QLineEdit, you might want to set the focus explicitly
-        # line_edit.setFocus()
+        self.table.editItem(new_item)
 
     def on_item_changed(self, item):
-        print(f"New tag entered: {item.text()}")
-        row = item.row()
-        column = item.column()
-        print(f"Changed item at row {row}, column {column}")
+        if(item.text() != "") :
+            row = item.row()
+            column = item.column()
+            upload_new_tag(get_sheets_serivce(self.creds), SHEET_ID, item.text())
+            print(f"Changed item at row {row}, column {column}")

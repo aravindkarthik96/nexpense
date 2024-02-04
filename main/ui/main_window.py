@@ -188,6 +188,9 @@ class MainWindow(QMainWindow):
             thread.deleteLater()
 
     def show_update_tags_dialog(self):
-        dialog = TagsDialog(self.tags, self)
+        dialog = TagsDialog(self.creds, self.tags, self)
         dialog.exec()
-        self.syncEmails()
+        self.updateTags()
+        self.display_transactions(
+            fetch_processed_transactions(self.creds, spreadsheet_id=SHEET_ID)
+        )

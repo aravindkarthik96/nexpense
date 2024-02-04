@@ -180,4 +180,20 @@ def fetch_tags(creds, spreadsheet_id) -> list:
     
     return tags
 
+def upload_new_tag(sheets_service, spreadsheet_id, new_tag):
+    print(f"Uploading new tag")
+    body = {"values": [[new_tag]]}
+
+    result = (
+        sheets_service.spreadsheets()
+        .values()
+        .append(
+            spreadsheetId=spreadsheet_id,
+            range="tags",
+            valueInputOption="USER_ENTERED",
+            body=body,
+        )
+        .execute()
+    )
+    print(f"{result.get('updates').get('updatedCells')} cells appended.")
 
