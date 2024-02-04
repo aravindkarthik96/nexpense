@@ -14,6 +14,7 @@ from constants import EMAIL_COUNT, SHEET_ID
 from main.google_apis.gmail_apis import get_email_serivce, get_message_ids
 from main.google_apis.sheets_apis import (
     fetch_processed_transactions,
+    fetch_tags,
 )
 from PyQt6.QtCore import Qt
 from main.processors.email_processor import EmailProcessorThread
@@ -25,6 +26,7 @@ from main.ui.tags_dialogue import TagsDialog
 
 class MainWindow(QMainWindow):
     creds = None
+    tags = []
 
     def __init__(self):
         super().__init__()
@@ -96,10 +98,14 @@ class MainWindow(QMainWindow):
 
     def autenticate_and_fetch_emails(self):
         self.creds = authenticate()
+        self.updateTags()
         self.syncEmails()
         self.display_transactions(
             fetch_processed_transactions(self.creds, spreadsheet_id=SHEET_ID)
         )
+
+    def updateTags(self):
+        self.tags = fetch_tags(self.creds, SHEET_ID)
 
     def authenticate_and_get_insights_from_data(self):
         self.creds = authenticate()
@@ -121,8 +127,13 @@ class MainWindow(QMainWindow):
         for row, transaction in enumerate(transactions):
             is_debit = transaction[4] == "debit"
             tag_combobox = QComboBox()
-            current_tag = transaction[6]
-            tag_combobox.addItems(["Food Orders", "Hobbies", "Utilities", "Transport"])
+            
+            if len(transaction) > 6:
+                current_tag = transaction[6]
+            else:
+                current_tag = "N/A"
+                
+            tag_combobox.addItems(self.tags)
 
             tag_index = tag_combobox.findText(current_tag)
             if tag_index >= 0:
@@ -175,8 +186,8 @@ class MainWindow(QMainWindow):
         if thread_id in self.threads:
             thread = self.threads.pop(thread_id)
             thread.deleteLater()
-            
+
     def show_update_tags_dialog(self):
-        tags = ["Tag1", "Tag2", "Tag3"]  # Replace with your actual tags list
-        dialog = TagsDialog(tags, self)
-        dialog.exec()  # Show the dialog as a modal window
+        dialog = TagsDialog(self.tags, self)
+        dialog.exec()
+        self.syncEmails()

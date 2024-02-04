@@ -1,10 +1,6 @@
-from constants import EMAIL_COUNT, SHEET_ID, USER_ID
+from constants import SHEET_ID
 from PyQt6.QtCore import QThread, pyqtSignal
-from main.google_apis.gmail_apis import (
-    get_email_serivce,
-    get_message_ids,
-    get_mime_message,
-)
+
 from main.google_apis.sheets_apis import (
     fetch_processed_transactions,
     get_sheets_serivce,
@@ -36,13 +32,20 @@ class TagsProcessorThread(QThread):
         print(f"finding transactions that match {self.message_id} with merchant name '{self.merchant_name}',new tag: '{self.new_tag}'")
         
         for row, transaction in enumerate(processedTransactions):
+            
+            try:
+                current_tag = transaction[6]
+            except IndexError:
+                current_tag = None
+            
             if (transaction[5] == self.merchant_name) & (
-                (transaction[0] == self.message_id) | (transaction[6] == "null")
+                (transaction[0] == self.message_id) | (current_tag == None)
             ):
-                print(f"updating tag on row {row} with merchant name '{transaction[5]}', message id '{self.message_id}', existing tag '{transaction[6]}'")
+                print(f"updating tag on row {row} with merchant name '{transaction[5]}', message id '{self.message_id}', existing tag '{current_tag}'")
                 set_tag_on_row(sheets_api, SHEET_ID, row+2, self.new_tag)
 
         print(f"Processing complete, emitting result")
         
-        self.finished.emit()
         print(f"Thread {self} finished")
+        self.finished.emit()
+        

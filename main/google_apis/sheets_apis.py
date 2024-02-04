@@ -168,4 +168,16 @@ def find_row_by_message_id_and_update_tag(sheets_service, spreadsheet_id, messag
     except Exception as e:
         print(f"An error occurred: {e}")
 
+def fetch_tags(creds, spreadsheet_id) -> list:
+    service = get_sheets_serivce(creds=creds)
+
+    sheet = service.spreadsheets()
+    result = (
+        sheet.values().get(spreadsheetId=spreadsheet_id, range="tags!A:A").execute()
+    )
+    
+    tags = [row[0] for row in result.get("values", []) if row]
+    
+    return tags
+
 
