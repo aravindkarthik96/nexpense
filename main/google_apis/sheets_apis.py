@@ -1,4 +1,5 @@
 from googleapiclient.discovery import build
+from requests import HTTPError
 
 
 def get_sheets_serivce(creds):
@@ -119,6 +120,23 @@ def fetch_processed_transactions(creds, spreadsheet_id) -> list:
         sheet.values().get(spreadsheetId=spreadsheet_id, range="Sheet1!A2:G").execute()
     )
     return result.get("values", [])
+
+def set_tag_on_row(sheets_service, spreadsheet_id, row_number, new_tag):
+    try:
+        tag_range = f'Sheet1!G{row_number}'
+        values = [[new_tag]]
+        body = {'values': values}
+        update_result = sheets_service.spreadsheets().values().update(
+            spreadsheetId=spreadsheet_id,
+            range=tag_range,
+            valueInputOption='USER_ENTERED',
+            body=body
+        ).execute()
+
+        print(f"Tag updated at row {row_number}. {update_result.get('updatedCells')} cells updated.")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 def find_row_by_message_id_and_update_tag(sheets_service, spreadsheet_id, message_id, new_tag):
     try:

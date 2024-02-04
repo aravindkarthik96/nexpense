@@ -43,7 +43,6 @@ class EmailProcessorThread(QThread):
             self.update_progress.emit((index / message_count)*100)
 
             if message_id in set(previously_processed_emails):
-                print(f"skipping message {message_id}, already present in DB")
                 continue
 
             new_message_ids.append(message_id)

@@ -14,13 +14,13 @@ from constants import EMAIL_COUNT, SHEET_ID
 from main.google_apis.gmail_apis import get_email_serivce, get_message_ids
 from main.google_apis.sheets_apis import (
     fetch_processed_transactions,
-    get_sheets_serivce,
-    find_row_by_message_id_and_update_tag,
 )
 from PyQt6.QtCore import Qt
 from main.processors.email_processor import EmailProcessorThread
 from main.google_apis.auth_apis import authenticate
 from main.processors.insights_processor import InsightsProcessorThread
+from main.processors.tags_processor import TagsProcessorThread
+from main.ui.tags_dialogue import TagsDialog
 
 
 class MainWindow(QMainWindow):
@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-
+        self.threads = {}
         self.setWindowTitle("Nexpense")
         self.setGeometry(50, 100, 600, 400)
 
@@ -63,12 +63,14 @@ class MainWindow(QMainWindow):
         self.get_insights_button.clicked.connect(
             self.authenticate_and_get_insights_from_data
         )
+        self.update_tags_button.clicked.connect(self.show_update_tags_dialog)
         self.autenticate_and_fetch_emails()
         self.table.itemChanged.connect(self.on_item_changed)
 
     def syncEmails(self):
         self.processing_start()
         self.thread = EmailProcessorThread(creds=self.creds)
+
         self.thread.update_progress.connect(self.update_progress)
         self.thread.finished.connect(self.processing_complete)
         self.thread.start()
@@ -130,9 +132,12 @@ class MainWindow(QMainWindow):
                 tag_combobox.setCurrentIndex(tag_combobox.findText(current_tag))
 
             tag_combobox.currentIndexChanged.connect(
-                lambda index, row=row, combobox=tag_combobox: self.on_tag_changed(
-                    transaction[0],
+                lambda index, row=row, combobox=tag_combobox, message_id=transaction[
+                    0
+                ], merchant_name=transaction[5]: self.on_tag_changed(
+                    message_id,
                     combobox.currentText(),
+                    merchant_name,
                 )
             )
 
@@ -156,8 +161,22 @@ class MainWindow(QMainWindow):
 
             self.table.scrollToBottom()
 
-    def on_tag_changed(self, message_id, new_tag):
-        print(f"Updating tag for message ID {message_id} to {new_tag}")
-        find_row_by_message_id_and_update_tag(
-            get_sheets_serivce(creds=self.creds), SHEET_ID, message_id, new_tag
+    def on_tag_changed(self, message_id, new_tag, merchant_name):
+        thread = TagsProcessorThread(
+            self.creds, SHEET_ID, message_id, merchant_name, new_tag
         )
+        thread_id = id(thread)
+        self.threads[thread_id] = thread
+        # self.syncEmails()
+        # thread.finished.connect(lambda: self.on_thread_finished(thread_id))
+        thread.start()
+
+    def on_thread_finished(self, thread_id):
+        if thread_id in self.threads:
+            thread = self.threads.pop(thread_id)
+            thread.deleteLater()
+            
+    def show_update_tags_dialog(self):
+        tags = ["Tag1", "Tag2", "Tag3"]  # Replace with your actual tags list
+        dialog = TagsDialog(tags, self)
+        dialog.exec()  # Show the dialog as a modal window
